@@ -1,33 +1,226 @@
-# Gradle files
-.gradle/
-build/
+#!/usr/bin/env python
+# coding: utf-8
 
-# Local configuration file (sdk path, etc)
-local.properties
+# In[25]:
 
-# Log/OS Files
-*.log
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-output.json
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+## machine learning
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn import metrics
 
-# Keystore files
-*.jks
-*.keystore
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
 
-# Android Profiling
-*.hprof
+## suppress warnings for this demo
+import warnings
+warnings.simplefilter('ignore')
+## set random seed for reproducibility
+np.random.seed(42)
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+df = pd.read_csv("Titanic-Dataset.csv").set_index('PassengerId')
+
+
+# In[5]:
+
+
+df = pd.read_csv("Titanic-Dataset.csv").set_index('PassengerId')
+
+
+# In[6]:
+
+
+df.head()
+
+
+# In[7]:
+
+
+df.info()
+
+
+# In[8]:
+
+
+df.describe()
+
+
+# In[9]:
+
+
+df2 = df.drop(['Name','Cabin','Ticket'],axis=1)
+df2 = df2.fillna(-1)
+
+
+# In[10]:
+
+
+## one hot encode our categoricals and create train/test sets
+df2 = pd.get_dummies(df2)
+X, y = df2.drop('Survived', axis=1), df2.Survived
+
+## create test and training sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, stratify=y, random_state=42)
+
+
+# In[15]:
+
+
+metrics.ConfusionMatrixDisplay.from_estimator(model, X_test, y_test)
+
+
+# In[16]:
+
+
+print(metrics.classification_report(y_test, y_pred))
+
+
+# In[17]:
+
+
+rf = RandomForestClassifier(n_estimators=500)
+svc = SVC(kernel='rbf')
+gbc = GradientBoostingClassifier(n_estimators=500)
+rf.fit(X_train, y_train)
+svc.fit(X_train, y_train)
+gbc.fit(X_train, y_train)
+
+## create a random classifier as a baseline
+random_preds = np.random.randint(0,1, y_test.shape[0])
+
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(6,6))
+metrics.RocCurveDisplay.from_estimator(svc, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(model, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(gbc, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(rf, X_test, y_test, ax=ax)
+
+metrics.RocCurveDisplay.from_predictions(y_test, random_preds, ax=ax, name='Random Predictions')
+
+plt.title('ROC-AUC Curves for Classifers (closer to top left = better)')
+
+
+# In[19]:
+
+
+## read in fresh data
+df = pd.read_csv("Titanic-Dataset.csv").set_index('PassengerId')
+
+## get full family size
+df['family_size'] = df.SibSp + df.Parch
+
+## extract titles out of our names as it might provide stratification within passenger classes
+df['title']= np.empty(df.shape[0])
+df['title'] = df.Name.str.extract('([A-Za-z]+)\.')
+df['title'] = df['title'].replace(['Mlle','Mme','Ms','Dr','Major','Lady','Countess','Jonkheer','Col','Rev','Capt','Sir','Don'],
+                    ['Miss','Miss','Miss','Mr','Mr','Mrs','Mrs','Other','Other','Other','Mr','Mr','Mr'])
+
+## better age imputation based on titles
+df.loc[(df.Age.isnull())&(df.title=='Mr'),'Age'] = df.Age[df.title=="Mr"].mean()
+df.loc[(df.Age.isnull())&(df.title=='Mrs'),'Age'] = df.Age[df.title=="Mrs"].mean()
+df.loc[(df.Age.isnull())&(df.title=='Master'),'Age'] = df.Age[df.title=="Master"].mean()
+df.loc[(df.Age.isnull())&(df.title=='Miss'),'Age'] = df.Age[df.title=="Miss"].mean()
+df.loc[(df.Age.isnull())&(df.title=='Other'),'Age'] = df.Age[df.title=="Other"].mean()
+
+## get the first letter of our Cabins - that might be helpful to have.
+df['Cabin_Prefix'] = ['A' if pd.isnull(x) else x[0] for x in df.Cabin]
+
+## impute our couple of missing values for Embarked
+df['Embarked'] = df['Embarked'].fillna(df.Embarked.mode())
+
+## drop our features that are too complex and unclean to meaningfully engineer furhter for this exercise, but you could find some cool stuff here!
+df = df.drop(['Ticket','Cabin'],axis=1)
+df.head()
+
+
+# In[21]:
+
+
+## one hot encode our categoricals and create train/test sets
+df2 = pd.get_dummies(df)
+X, y = df2.drop('Survived', axis=1), df2.Survived
+
+## create test and training sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.25, stratify=y, random_state=42)
+
+
+# In[22]:
+
+
+rf = RandomForestClassifier(n_estimators=500)
+svc = SVC(kernel='rbf')
+gbc = GradientBoostingClassifier(n_estimators=500)
+logreg = LogisticRegression(max_iter=1000)
+rf.fit(X_train, y_train)
+svc.fit(X_train, y_train)
+gbc.fit(X_train, y_train)
+logreg.fit(X_train, y_train)
+
+## create a random classifier as a baseline
+random_preds = np.random.randint(0,1, y_test.shape[0])
+
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(6,6))
+metrics.RocCurveDisplay.from_estimator(svc, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(rf, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(gbc, X_test, y_test, ax=ax)
+metrics.RocCurveDisplay.from_estimator(logreg, X_test, y_test, ax=ax)
+
+metrics.RocCurveDisplay.from_predictions(y_test, random_preds, ax=ax, name='Random Predictions')
+
+plt.title('ROC-AUC Curves for Classifers (closer to top left = better)')
+
+
+# In[23]:
+
+
+from sklearn.model_selection import RandomizedSearchCV
+
+## define the hyperparameters we want to search across
+params = {'criterion':['gini','log_loss','entropy'],
+          'n_estimators':[100,200,500],
+          'max_features':[2,4,6,12,'sqrt','log2'],
+          'max_depth':[3,5,10,20,None],
+          'class_weight':[None,'balanced','balanced_subsample']}
+
+## search across our parameters and find "optimal" outputs
+## NOTE:  THIS WILL TAKE A WHILE TO TRAIN - you're building potentially hundreds of models here!
+search = RandomizedSearchCV(RandomForestClassifier(random_state=42), 
+                            params,
+                            scoring='roc_auc',
+                            n_iter=100,
+                            n_jobs=-1,
+                            verbose=2).fit(X_train, y_train)
+
+## get the best params from the search
+tuned_rf = search.best_estimator_
+print(tuned_rf)
+
+## get our predictions from the tuned model
+tuned_preds = tuned_rf.predict(X_test)
+
+
+# In[24]:
+
+
+## create a random classifier as a baseline
+random_preds = np.random.randint(0,1, y_test.shape[0])
+
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(6,6))
+metrics.RocCurveDisplay.from_estimator(rf, X_test, y_test, ax=ax, name='Original RF')
+metrics.RocCurveDisplay.from_estimator(tuned_rf, X_test, y_test, ax=ax, name='Tuned RF')
+
+metrics.RocCurveDisplay.from_predictions(y_test, random_preds, ax=ax, name='Random Predictions')
+
+plt.title('ROC-AUC Curves for Classifers (closer to top left = better)')
